@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <base target="_top">
+</head>
+
+<body>
+  <style>
+    h2, h4 {
+      margin-left: 40px
+    }
+    input {
+      width: 200px;
+      padding: 5px;
+    }
+    .controlBox, .asControlBox {
+      margin: 10px 10px 10px 70px;
+    }
+    #submit {
+      margin: 20px 20px 20px 120px;
+    }
+    .hidden {
+      display: none;
+    }
+  </style>
+
+  <div id="OrderBefore">
+
+    <h2>Nová objednávka / New Order</h2>
+    <form id="addRowForm">
+      <div class="controlBox">
+        <label for="jmeno">Jméno / <small>FirstName</small></label><br>
+        <input type="text" id="jmeno" name="jmeno"><br>
+      </div>
+      <div class="controlBox">
+        <label for="prijmeni">Příjmení / <small>LastName</small></label><br>
+        <input type="text" id="prijmeni" name="prijmeni" style="width: 200px; padding: 5px;"><br>
+      </div>
+      <div class="controlBox">
+        <label for="zasilkovna">
+            ID Zásilkovny pro vyzvednutí (pouze číslice) <a target="_blank" href="https://www.zasilkovna.cz/pobocky">najdi zde</a> / <small>ID of Zasilkovna for pickup (digits only) <a target="_blank" href="https://www.zasilkovna.cz/pobocky">find here</a></small>
+          </label><br>
+        <input type="number" value="0" min="0" max="999999" step="1" id="zasilkovna" name="zasilkovna"><br>
+      </div>
+      <div class="controlBox">
+        <label for="email">Email (použijeme při problému) / <small>Email (we use it when problem occurs)</small></label><br>
+        <input type="text" id="email" name="email"><br>
+      </div>
+      <div class="controlBox">
+        <label for="telefon">Telefon (použijeme při problému) / <small>Phone (we use it when problem occurs)</small></label><br>
+        <input type="text" id="telefon" name="telefon"><br>
+      </div>
+
+      <h4>Objednávám / <small>I order</small></h4>
+
+      <div id="sortimentContainer"><span id="placeholderItems" class="asControlBox">(načítá se .. / loading ..)</span></div>
+      <div id="sortimentItemTemplate" class="controlBox hidden">
+        <label></label><br>
+        <input type="number" value="0" min="0" max="50" step="1">
+      </div>
+
+      <input id="submit" type="button" value="Objednat / Submit" onclick="submitForm()">
+    </form>
+
+  </div>
+
+  <div id="OrderAfter" class="asControlBox hidden">
+    <p><strong>
+      Objednáno. Děkujeme. / <small>Ordered. Thank you.</small>
+    </strong></p>
+    <p>
+      Prosím, až budeš platit na účet <b><span class="bankAccount">(načítá se ..)</span></b>, označ platbu variabilním symbolem <b><span class="paymentCode">(načítá se ..)</span></b>.
+      Celková částka je <b><span class="totalPrice">(načítá se ..)</span> Kč</b>.<small><span class="postFeeNote"> (To zahrnuje <span class="postFee"></span> Kč poštovné.)</span></small><br>
+      <small>
+        Please pay to the account <b><span class="bankAccount">(loading ..)</span></b> and mark the payment with "variabilní symbol" <b><span class="paymentCode">(loading ..)</span></b>.
+        Total price is <b><span class="totalPrice">(loading ..)</span> CZK</b>.<span class="postFeeNote"> (<span class="postFee"></span> CZK post fee included.)</span>
+      </small>
+    </p>
+  </div>
+
+  <script>
+    onInit();
+
+    function onInit() {
+      google.script.run.withSuccessHandler(generateSortiment).getSortiment();
+    }
+    function generateSortiment(grabbedSortiment) {
+      let sortimentContainer = document.getElementById('sortimentContainer');
+      let sortimentTemplate = document.getElementById('sortimentItemTemplate');
+      let clonedElement, inputEl, labelEl, shorthandLower;
+      let placeholderEl = document.getElementById('placeholderItems');
+      grabbedSortiment.forEach(row => {
+        if (row[0]) {
+          if (placeholderEl) {
+            placeholderEl.remove();
+            placeholderEl = null;
+          }
+          shorthandLower = row[0].toLowerCase();
+          clonedElement = sortimentTemplate.cloneNode(true);
+          clonedElement.removeAttribute('id');
+          labelEl = clonedElement.getElementsByTagName('label')[0];
+          labelEl.innerHTML = `${row[1]} / <small>${row[2]}</small> / ${row[3]} Kč`;
+          labelEl.setAttribute('for', shorthandLower);
+          inputEl = clonedElement.getElementsByTagName('input')[0];
+          inputEl.classList.add('orderInput');
+          inputEl.setAttribute('id', shorthandLower);
+          inputEl.setAttribute('name', shorthandLower);
+          inputEl.setAttribute('price', row[3]);
+          inputEl.setAttribute('minPostFee', row[4]);
+          clonedElement.classList.remove('hidden');
+          sortimentContainer.appendChild(clonedElement);
+        }
+      });
+    }
+
+    function ware(orderInput) {
+        let txt = '';
+        let shorthand = orderInput.getAttribute('name');
+        let pieces = parseInt(orderInput.value);
+        if (pieces) {
+          txt = `${pieces} ${shorthand.toUpperCase()}`
+        }
+        return {
+          pieces: pieces,
+          txt: txt
+        };
+      }
+      function submitForm() {
+        let data = {
+          jmeno: document.getElementById('jmeno').value,
+          prijmeni: document.getElementById('prijmeni').value,
+          zasilkovna: parseInt(document.getElementById('zasilkovna').value),
+          email: document.getElementById('email').value,
+          telefon: document.getElementById('telefon').value
+          // objednavka: "",
+          // castka: 0,
+          // postFee: 0,
+        };
+
+        if (!data.jmeno)  {
+          alert("Prosím, uveď křestní jméno. / Please enter the FirstName.");
+        } else if (!data.prijmeni) {
+          alert("Prosím, uveď příjmení. / Please enter the LastName.");
+        } else if (!data.zasilkovna) {
+          alert("Prosím, zadej číslo Zásikovny pro vyzvednutí. / Please enter a number of Zasilkovna for packet pickup.");
+        } else if (!data.email.includes('@') && !data.telefon) {
+          alert("Prosím, zanech nějaký kontakt (email, telefon). / Please enter some contact (email, phone).");
+        } else {
+
+          // collect ordered ware
+          let wareObject;
+          let polozky = [];
+          let price = 0;
+          let postFee = 0;
+          let orderInputs = document.querySelectorAll('.orderInput');
+          orderInputs.forEach(function(orderInput) {
+            wareObject = ware(orderInput)  // {pieces, txt}
+            if (wareObject.pieces) {
+              polozky.push(wareObject.txt);
+              price += wareObject.pieces * orderInput.getAttribute('price');
+              postFee = Math.max(postFee, orderInput.getAttribute('minPostFee'));
+            }
+          });
+
+          if (polozky.length === 0) {
+            alert('Prosím vyber aspoň 1 ks u některé položky. / Please, enter at least 1 piece for one of the offered items.');
+          } else {
+            data.objednavka = polozky.join(', ');
+            data.castka = price + postFee;
+            data.postFee = postFee;
+            google.script.run.withSuccessHandler(successHandler).addRow(data);
+          }
+        }
+      }
+      function successHandler(retVal) {
+        let spanElements = document.querySelectorAll('.bankAccount');
+        spanElements.forEach(function(spanElement) {
+          spanElement.textContent = retVal.bankAccount;
+        });
+        spanElements = document.querySelectorAll('.paymentCode');
+        spanElements.forEach(function(spanElement) {
+          spanElement.textContent = retVal.paymentCode;
+        });
+        spanElements = document.querySelectorAll('.totalPrice');
+        spanElements.forEach(function(spanElement) {
+          spanElement.textContent = retVal.totalPrice;
+        });
+        spanElements = document.querySelectorAll('.postFee');
+        spanElements.forEach(function(spanElement) {
+          spanElement.textContent = retVal.postFee;
+        });
+        postFeeNote = document.querySelectorAll('.postFeeNote');
+        postFeeNote.forEach(function(note) {
+          if (retVal.postFee) {
+            note.classList.remove('hidden');
+          } else {
+            note.classList.add('hidden');
+          }
+        });
+
+        // Reset form fields
+        document.getElementById('addRowForm').reset();
+        document.getElementById("OrderBefore").classList.add('hidden');
+        document.getElementById("OrderAfter").classList.remove('hidden');
+      }
+  </script>
+</body>
+
+</html>
